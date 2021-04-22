@@ -40,9 +40,10 @@ public extension FaveButtonDelegate{
     func faveButtonDotColors(_ faveButton: FaveButton) -> [DotColors]?{ return nil }
 }
 
-open class FaveButton: UIButton {
-    
-    fileprivate struct Const{
+
+open class FaveButton: UIButton
+{
+    fileprivate struct Const {
         static let duration             = 1.0
         static let expandDuration       = 0.1298 
         static let collapseDuration     = 0.1089
@@ -61,7 +62,8 @@ open class FaveButton: UIButton {
     
     fileprivate(set) var sparkGroupCount: Int = 7
     
-    fileprivate var faveIconImage:UIImage?
+    fileprivate var faveIconImage: UIImage?
+    fileprivate var faveSelectedImage: UIImage?
     fileprivate var faveIcon: FaveIcon!
     fileprivate var animationsEnabled = true
     
@@ -113,39 +115,40 @@ open class FaveButton: UIButton {
 
 
 // MARK: create
-extension FaveButton{
-    fileprivate func applyInit(){
-        
-        if nil == faveIconImage{
-            #if swift(>=4.2)
-            faveIconImage = image(for: UIControl.State())
-            #else
-            faveIconImage = image(for: UIControlState())
-            #endif
+extension FaveButton
+{
+    fileprivate func applyInit() {
+        if nil == faveIconImage {
+            faveIconImage = image(for: .normal)
         }
         
-        guard let faveIconImage = faveIconImage else{
+        if nil == faveSelectedImage {
+            faveSelectedImage = image(for: .selected)
+            if faveSelectedImage == faveIconImage {
+                faveSelectedImage = nil
+            }
+        }
+        
+        guard
+            let faveIconImage = faveIconImage
+        else {
             fatalError("please provide an image for normal state.")
         }
         
-        #if swift(>=4.2)
-        setImage(UIImage(), for: UIControl.State())
-        setTitle(nil, for: UIControl.State())
-        #else
-        setImage(UIImage(), for: UIControlState())
-        setTitle(nil, for: UIControlState())
-        #endif
+        setImage(UIImage(), for: .normal)
+        setTitle(nil, for: .normal)
+        
         setImage(UIImage(), for: .selected)
         setTitle(nil, for: .selected)
         
-        faveIcon  = createFaveIcon(faveIconImage)
+        faveIcon = createFaveIcon(image: faveIconImage, selectedImage: faveSelectedImage)
         
         addActions()
     }
     
     
-    fileprivate func createFaveIcon(_ faveIconImage: UIImage) -> FaveIcon{
-        return FaveIcon.createFaveIcon(self, icon: faveIconImage,color: normalColor)
+    fileprivate func createFaveIcon(image: UIImage, selectedImage: UIImage?) -> FaveIcon {
+        return FaveIcon.createFaveIcon(self, icon: image, selectedIcon: selectedImage, color: normalColor)
     }
     
     
@@ -207,7 +210,7 @@ extension FaveButton{
 
 // MARK: animation
 extension FaveButton {
-    fileprivate func animateSelect(_ isSelected: Bool, duration: Double){
+    fileprivate func animateSelect(_ isSelected: Bool, duration: Double) {
         let color  = isSelected ? selectedColor : normalColor
         
         faveIcon.animateSelect(isSelected, fillColor: color, duration: duration, delay: duration > 0.0 ? Const.faveIconShowDelay : 0.0)

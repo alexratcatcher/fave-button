@@ -24,19 +24,27 @@
 
 import UIKit
 
-class FaveIcon: UIView {
-    
-    var iconColor: UIColor = .gray
+
+class FaveIcon: UIView
+{
     var iconImage: UIImage!
-    var iconLayer: CAShapeLayer!
-    var iconMask:  CALayer!
+    var selectedIconImage: UIImage?
+    var iconColor: UIColor = .gray
+    
+    var iconLayer: CALayer!
+    var maskedIconLayer: CAShapeLayer!
+    
     var contentRegion: CGRect!
     var tweenValues: [CGFloat]?
     
-    init(region: CGRect, icon: UIImage, color: UIColor) {
-        self.iconColor      = color
-        self.iconImage      = icon
-        self.contentRegion  = region
+    init(region: CGRect, icon: UIImage, selectedIcon: UIImage?, color: UIColor) {
+        self.contentRegion = region
+        
+        self.iconImage = icon
+        self.selectedIconImage = selectedIcon
+        
+        self.iconColor = color
+        
         super.init(frame: CGRect.zero)
         
         applyInit()
@@ -48,13 +56,13 @@ class FaveIcon: UIView {
 }
 
 
-// MARK: create
-extension FaveIcon{
-    
-    class func createFaveIcon(_ onView: UIView, icon: UIImage, color: UIColor) -> FaveIcon{
-        let faveIcon = Init(FaveIcon(region:onView.bounds, icon: icon, color: color)){
+// MARK: Create
+extension FaveIcon
+{
+    class func createFaveIcon(_ onView: UIView, icon: UIImage, selectedIcon: UIImage?, color: UIColor) -> FaveIcon {
+        let faveIcon = Init(FaveIcon(region:onView.bounds, icon: icon, selectedIcon: selectedIcon, color: color)) {
             $0.translatesAutoresizingMaskIntoConstraints = false
-            $0.backgroundColor                           = .clear
+            $0.backgroundColor = .clear
         }
         onView.addSubview(faveIcon)
         
@@ -65,31 +73,34 @@ extension FaveIcon{
         return faveIcon
     }
     
-    func applyInit(){
-        let maskRegion  = contentRegion.size.scaleBy(0.7).rectCentered(at: contentRegion.center)
+    func applyInit() {
+        let iconRegion  = contentRegion.size.scaleBy(0.7).rectCentered(at: contentRegion.center)
         let shapeOrigin = CGPoint(x: -contentRegion.center.x, y: -contentRegion.center.y)
         
-        
-        iconMask = Init(CALayer()){
+        iconLayer = Init(CALayer()){
             $0.contents      = iconImage.cgImage
             $0.contentsScale = UIScreen.main.scale
-            $0.bounds        = maskRegion
+            $0.bounds        = iconRegion
         }
         
-        iconLayer = Init(CAShapeLayer()){
-            $0.fillColor = iconColor.cgColor
-            $0.path      = UIBezierPath(rect: CGRect(origin: shapeOrigin, size: contentRegion.size)).cgPath
-            $0.mask      = iconMask
+        if selectedIconImage == nil {
+            maskedIconLayer = Init(CAShapeLayer()) {
+                $0.fillColor = iconColor.cgColor
+                $0.path      = UIBezierPath(rect: CGRect(origin: shapeOrigin, size: contentRegion.size)).cgPath
+                $0.mask      = iconLayer
+            }
+            layer.addSublayer(maskedIconLayer)
         }
-        
-        self.layer.addSublayer(iconLayer)
+        else {
+            layer.addSublayer(iconLayer)
+        }
     }
 }
 
 
-// MARK : animation
-extension FaveIcon{
-    
+// MARK: Animation
+extension FaveIcon
+{
     func animateSelect(_ isSelected: Bool = false, fillColor: UIColor, duration: Double = 0.5, delay: Double = 0){
         let animate = duration > 0.0
         
@@ -97,11 +108,13 @@ extension FaveIcon{
             tweenValues = generateTweenValues(from: 0, to: 1.0, duration: CGFloat(duration))
         }
         
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-            iconLayer.fillColor = fillColor.cgColor
-        CATransaction.commit()
-        
+        if selectedIconImage == nil {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+                maskedIconLayer.fillColor = fillColor.cgColor
+            CATransaction.commit()
+        }
+
         let selectedDelay = isSelected ? delay : 0
         
         if isSelected {
@@ -112,7 +125,14 @@ extension FaveIcon{
                 options: .curveLinear,
                 animations: {
                     self.alpha = 1
-                }, completion: nil)
+                }, completion: { completed in
+                    if completed, let image = self.selectedIconImage {
+                        self.changeImageLayer(image: image)
+                    }
+                })
+        }
+        else if selectedIconImage != nil, let image = iconImage {
+            changeImageLayer(image: image)
         }
         
         guard animate else {
@@ -124,12 +144,25 @@ extension FaveIcon{
             $0.duration  = duration
             $0.beginTime = CACurrentMediaTime()+selectedDelay
         }
-        iconMask.add(scaleAnimation, forKey: nil)
+        iconLayer.add(scaleAnimation, forKey: nil)
     }
     
+    private func changeImageLayer(image: UIImage) {
+        let oldIconMask = iconLayer
+        
+        let maskRegion = contentRegion.size.scaleBy(0.7).rectCentered(at: contentRegion.center)
+        let newIconMask = Init(CALayer()) {
+            $0.contents      = image.cgImage
+            $0.contentsScale = UIScreen.main.scale
+            $0.bounds        = maskRegion
+        }
+        layer.addSublayer(newIconMask)
+        
+        oldIconMask?.removeFromSuperlayer()
+        iconLayer = newIconMask
+    }
     
-    
-    func generateTweenValues(from: CGFloat, to: CGFloat, duration: CGFloat) -> [CGFloat]{
+    private func generateTweenValues(from: CGFloat, to: CGFloat, duration: CGFloat) -> [CGFloat] {
         var values         = [CGFloat]()
         let fps            = CGFloat(60.0)
         let tpf            = duration/fps
@@ -138,7 +171,7 @@ extension FaveIcon{
         var t              = CGFloat(0.0)
         let tweenFunction  = Elastic.ExtendedEaseOut
         
-        while(t < d){
+        while(t < d) {
             let scale = tweenFunction(t, from, c, d, c+0.001, 0.39988)  // p=oscillations, c=amplitude(velocity)
             values.append(scale)
             t += tpf
